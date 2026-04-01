@@ -9,7 +9,7 @@ description: >
   until this skill's QA gate passes. Trigger on: "smoke test", "run tests", "QA this",
   "verify the build", phase completion, or any indication that code was just built
   and needs verification. If you just finished building something and are about to
-  say "done" — STOP and run this skill first. The Stop hook triggers this
+  say "done" — STOP and run this skill first. The QA Gate Enforcer (command-based Stop hook) triggers this
   automatically but if you see it was skipped, invoke it manually.
 ---
 
