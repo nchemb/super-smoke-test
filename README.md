@@ -13,7 +13,7 @@ AI coding agents execute a build phase, say "done" — and when you open the bro
 After any execution phase (GSD, Superpowers, or any phased build):
 
 1. **Checks if QA is needed** — Skips for planning phases, docs, config, migrations
-2. **Code review via Codex** (optional) — Runs `/codex:review`, waits, fixes all findings
+2. **Code review via Codex** (optional) — Runs `/codex:review`, waits for results, fixes all findings before proceeding
 3. **Browser smoke test via Playwright CLI** — Navigates routes, screenshots, checks console + network
 4. **Auto-fixes failures** — Auth bypass issues, stale cache, missing deps — fixes and re-tests
 5. **Reports combined results** — Code review summary + smoke test pass/fail table with proof
