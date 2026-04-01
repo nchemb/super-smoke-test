@@ -48,7 +48,7 @@ cp -r super-smoke-test ~/.claude/skills/
 cp -r super-smoke-test .claude/skills/
 ```
 
-### 3. Install the Stop Hook (Recommended)
+### 3. Install the Stop Hook (Required for Reliable Triggering)
 
 The Stop hook is what makes this airtight. It fires deterministically after every Claude response and checks if a QA gate should run. Without it, you're relying on Claude to remember.
 
