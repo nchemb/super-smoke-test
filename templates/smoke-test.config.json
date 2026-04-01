@@ -1,0 +1,23 @@
+{
+  "framework": "nextjs",
+  "port": null,
+  "auth": {
+    "type": "clerk",
+    "bypass_cookie": "__dev_bypass",
+    "bypass_value": "1",
+    "middleware_path": "src/middleware.ts",
+    "auth_helper_path": "src/lib/supabase/server.ts",
+    "auth_function": "getAuthUserId",
+    "dev_user_id": "DEV_BYPASS_USER_ID"
+  },
+  "base_routes": ["/", "/dashboard"],
+  "route_dir": "src/app",
+  "protected_prefixes": ["/dashboard", "/admin", "/settings", "/account"],
+  "ignore_console": [
+    "Download the React DevTools",
+    "Clerk:",
+    "useSearchParams() should be wrapped in a suspense boundary"
+  ],
+  "ignore_network": [],
+  "max_fix_attempts": 3
+}

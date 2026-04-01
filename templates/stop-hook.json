@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "BEFORE presenting your response to the user, check: did you just complete an EXECUTION phase (GSD, Superpowers, or any phased build) that produced code changes? Look for signals: you just wrote or modified multiple files, you completed a numbered phase from a plan, you're about to say 'done' or 'phase complete' or 'try it now'. If YES: run the super-smoke-test skill NOW. Do not present results until the QA gate passes. If NO (this was a planning phase, conversation, documentation, or you already ran the QA gate): proceed normally."
+          }
+        ]
+      }
+    ]
+  }
+}
