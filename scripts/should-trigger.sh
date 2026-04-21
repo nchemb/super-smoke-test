@@ -6,13 +6,26 @@
 # Checks git diff for changed files and applies rules to decide if browser
 # smoke testing is warranted.
 
-BASE_REF="${1:-HEAD~1}"
+BASE_REF="${1:-}"
 
-# Get changed files (try multiple strategies)
+# If no base ref given, scan the full phase diff (not just HEAD~1).
+# Strategy: find the merge-base with main/master, fall back to HEAD~10.
+if [ -z "$BASE_REF" ]; then
+  for main_ref in main master; do
+    if git rev-parse --verify "$main_ref" >/dev/null 2>&1; then
+      BASE_REF=$(git merge-base HEAD "$main_ref" 2>/dev/null)
+      break
+    fi
+  done
+  [ -z "$BASE_REF" ] && BASE_REF="HEAD~10"
+fi
+
+# Get changed files across the full phase range (committed + staged + working tree)
 CHANGED=$(
-  git diff --name-only "$BASE_REF" 2>/dev/null || \
-  git diff --name-only --cached 2>/dev/null || \
-  git status --porcelain | awk '{print $2}'
+  { git diff --name-only "$BASE_REF"..HEAD 2>/dev/null; \
+    git diff --name-only --cached 2>/dev/null; \
+    git status --porcelain | awk '{print $2}'; \
+  } | sort -u
 )
 
 if [ -z "$CHANGED" ]; then

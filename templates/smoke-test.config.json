@@ -3,12 +3,14 @@
   "port": null,
   "auth": {
     "type": "clerk",
+    "bypass_env": "SMOKE_TEST_BYPASS",
     "bypass_cookie": "__dev_bypass",
     "bypass_value": "1",
     "middleware_path": "src/middleware.ts",
     "auth_helper_path": "src/lib/supabase/server.ts",
     "auth_function": "getAuthUserId",
-    "dev_user_id": "DEV_BYPASS_USER_ID"
+    "dev_user_id": "DEV_BYPASS_USER_ID",
+    "seed_profile_sql": null
   },
   "base_routes": ["/", "/dashboard"],
   "route_dir": "src/app",
@@ -19,5 +21,20 @@
     "useSearchParams() should be wrapped in a suspense boundary"
   ],
   "ignore_network": [],
-  "max_fix_attempts": 3
+  "max_fix_attempts": 3,
+  "dimension_defaults": {
+    "card_min_width": 200,
+    "card_min_height": 80,
+    "button_min_width": 64,
+    "button_min_height": 32
+  },
+  "db_assertions": {
+    "enabled": true,
+    "provider": "supabase",
+    "mutation_keywords": ["create", "update", "delete", "submit", "save"]
+  },
+  "regression_gate": {
+    "enabled": true,
+    "skip_build": false
+  }
 }
