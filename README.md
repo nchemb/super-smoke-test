@@ -10,13 +10,21 @@ AI coding agents execute a build phase, say "done" — and when you open the bro
 
 ## What It Does
 
+Runs **after** `/gsd-execute-phase` completes. Execute is NOT part of this skill — you run it yourself first, then invoke this as the gate.
+
 After any execution phase (GSD, Superpowers, or any phased build):
 
-1. **Checks if QA is needed** — Skips for planning phases, docs, config, migrations
-2. **Code review via Codex** (optional) — Runs `/codex:review`, waits for results, fixes all findings before proceeding
-3. **Browser smoke test via Playwright CLI** — Navigates routes, screenshots, checks console + network
-4. **Auto-fixes failures** — Auth bypass issues, stale cache, missing deps — fixes and re-tests
-5. **Reports combined results** — Code review summary + smoke test pass/fail table with proof
+1. **Checks if QA is needed** — Skips for planning-only, docs, migration, or config-only phases.
+2. **`/gsd-code-review` + auto-fix** — Claude re-reads changed source, produces severity-classified `REVIEW.md`, auto-applies fixes.
+3. **Regression gate** — `tsc + lint + build`. Blocks on regression, never auto-reverts.
+4. **`/codex:review` + fix** — Second-opinion review from an external LLM (Codex / GPT-5). Catches what Claude self-review missed.
+5. **Regression gate** (again) — After Codex fixes.
+6. **Playwright headless smoke** — DOM + dimension + console + network asserts + screenshots, scenarios derived from PLAN.md/SUMMARY.md requirement IDs.
+7. **DB assertions via Supabase MCP** — For every mutation scenario. Catches "spec passed but nothing was written."
+8. **Auto-fix loop** (max 3 attempts) — Auth bypass, stale cache, missing deps — fix and re-test.
+9. **Conditional `/gsd-verify-work`** — Auto-invokes conversational UAT **only** if the phase diff includes user-facing surface (routes, components, middleware, server actions). Skipped for pure infra/API/migration phases.
+10. **`/gsd-extract_learnings`** — Persists decisions, surprises, patterns for future phases.
+11. **Final report** — Two-LLM review summary + smoke test pass/fail table + verify-work decision + learnings path.
 
 The phase is **not complete** until the QA gate passes.
 
@@ -101,39 +109,41 @@ The first time the skill runs in a project, it creates `smoke-test.config.json` 
 ## The QA Pipeline
 
 ```
-Execution Phase Completes
+/gsd-execute-phase completes  (NOT part of this skill — run yourself)
         │
+        ▼
    should-trigger.sh → SKIP or TRIGGER
         │
       TRIGGER
         │
-   ┌─ Codex installed? ─── NO ──→ Skip to Smoke Test
+        ▼
+   ┌── /gsd-code-review <N>                (Claude self-review → REVIEW.md)
+   ├── /gsd-code-review-fix <N> --auto     (if findings)
+   ├── regression-gate.sh                  (tsc + lint + build — BLOCK on fail)
    │
-  YES
+   ├── /codex:review                       (external-LLM review, second opinion)
+   ├── Apply Codex fixes                   (critical → easy medium)
+   ├── regression-gate.sh                  (again, after Codex fixes)
    │
-   ├─ /codex:review → wait for results
-   ├─ Fix all findings (critical → low)
-   ├─ Re-review if significant fixes applied
+   ├── parse-gsd-artifacts.sh              (PLAN.md + SUMMARY.md → scenarios JSON)
+   ├── smoke-test-auth-bypass skill        (wire bypass if auth provider detected)
+   ├── detect-server.sh                    (port + SMOKE_TEST_BYPASS=true)
+   ├── generate-spec.sh → Playwright       (headless, serial, persistent ctx)
+   │    ├── DOM asserts
+   │    ├── Dimension asserts (CSS collapse)
+   │    ├── Console filter
+   │    └── Network 4xx/5xx
+   ├── DB assertions                       (mcp__supabase__execute_sql per mutation)
+   ├── Auto-fix loop (max 3)               → regression gate → re-run spec
+   │
+   ├── should-verify.sh                    (stricter heuristic than trigger)
+   │    ├── VERIFY → /gsd-verify-work <N>  (conversational UAT)
+   │    └── SKIP  → note in report (pure infra / API / migration)
+   │
+   ├── /gsd-extract_learnings <N>          (always, if .planning/ exists)
    │
    ▼
-   Smoke Test (Playwright CLI)
-   ├─ Load/create smoke-test.config.json
-   ├─ Verify auth bypass is wired
-   ├─ Detect/start dev server
-   ├─ Derive test routes from git diff
-   ├─ For each route:
-   │   ├─ Navigate with auth bypass cookie
-   │   ├─ Snapshot (accessibility tree → disk)
-   │   ├─ Screenshot (PNG → disk)
-   │   ├─ Check console (filter framework noise)
-   │   └─ Check network (flag 4xx/5xx)
-   ├─ Auto-fix failures (up to 3 attempts)
-   │
-   ▼
-   Report: combined review + smoke test results
-   │
-   ▼
-   ONLY NOW → "Phase complete"
+   Report → ONLY NOW "Phase complete"
 ```
 
 ## Configuration
@@ -172,13 +182,19 @@ Execution Phase Completes
 | `ignore_console` | Console patterns to skip | `[]` |
 | `max_fix_attempts` | Auto-fix retry limit | `3` |
 
-## Trigger Heuristic
+## Trigger Heuristics (two scripts, different strictness)
 
-Not every phase needs QA. The skill checks `git diff` automatically:
+The skill uses two git-diff-based scripts at different stages:
 
-**Triggers:** Page/layout/route files, components, middleware, styling, `package.json`
+**`should-trigger.sh`** (Step 0) — decides if the full QA gate runs at all:
+- Triggers: Page/layout/route files, components, middleware, styling, `package.json`, `src/lib/`, `src/hooks/`, etc.
+- Skips: Docs, test files, config, migrations, scripts, CI/CD files.
 
-**Skips:** Docs, test files, config, migrations, scripts, CI/CD files
+**`should-verify.sh`** (Step 12) — stricter, decides if `/gsd-verify-work` auto-invokes:
+- Verifies: `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `template.tsx`, `src/components/`, `middleware.ts`, server actions (`src/actions/`, `app/actions/`).
+- Skips: API routes, lib/, tools/, types/, migrations, config, docs, public/ assets, global CSS. Those phases pass the gate via automated smoke + DB asserts alone; a human has nothing to click-through for invisible plumbing.
+
+Both scripts use ERE-compatible regex (plain parens, not `\(a\|b\)`) so they work on BSD grep (macOS default). If you're extending either, keep that convention.
 
 ## Supported Auth Providers
 
@@ -212,15 +228,20 @@ Not every phase needs QA. The skill checks `git diff` automatically:
 
 ```
 super-smoke-test/
-├── SKILL.md                          ← QA gate protocol
+├── SKILL.md                          ← QA gate protocol (14 steps)
 ├── README.md                         ← This file
 ├── scripts/
-│   ├── should-trigger.sh             ← Trigger heuristic (TRIGGER/SKIP)
-│   ├── derive-routes.sh              ← File path → browser route mapping
-│   └── detect-server.sh              ← Port detection + conflict resolution
+│   ├── should-trigger.sh             ← Step 0 trigger heuristic (TRIGGER/SKIP)
+│   ├── should-verify.sh              ← Step 12 verify-work heuristic (VERIFY/SKIP)
+│   ├── regression-gate.sh            ← tsc + lint + build gate
+│   ├── parse-gsd-artifacts.sh        ← PLAN.md + SUMMARY.md → scenarios JSON
+│   ├── derive-routes.sh              ← Fallback: file path → browser route mapping
+│   ├── detect-server.sh              ← Port detection + conflict resolution
+│   └── generate-spec.sh              ← scenarios JSON → Playwright spec file
 ├── references/
 │   ├── auth-patterns.md              ← Auth bypass patterns (Clerk, NextAuth, etc.)
-│   └── common-failures.md            ← Diagnostic + fix lookup table
+│   ├── common-failures.md            ← Diagnostic + fix lookup table
+│   └── playwright-scenarios.md       ← Scenario JSON schema + action vocabulary
 └── templates/
     ├── smoke-test.config.json        ← Default project config
     └── stop-hook.json                ← Stop hook for deterministic triggering

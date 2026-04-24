@@ -34,18 +34,20 @@ if [ -z "$CHANGED" ]; then
 fi
 
 # --- TRIGGER patterns (any match = run smoke tests) ---
+# Uses plain ERE parens — BSD grep (macOS default) does NOT honor
+# backslash-paren groups under -E. Do not use \(a\|b\).
 TRIGGER_PATTERNS=(
   # Route pages
-  'page\.\(tsx\|ts\|jsx\|js\)$'
+  'page\.(tsx|ts|jsx|js)$'
   # Layouts (affect all child routes)
-  'layout\.\(tsx\|ts\|jsx\|js\)$'
+  'layout\.(tsx|ts|jsx|js)$'
   # API routes
-  'route\.\(tsx\|ts\)$'
+  'route\.(tsx|ts)$'
   # Shared components
   'src/components/'
   'components/'
   # Middleware (auth/routing)
-  'middleware\.\(ts\|tsx\|js\)$'
+  'middleware\.(ts|tsx|js)$'
   # Styling
   'globals\.css'
   'tailwind\.config'
